@@ -1,10 +1,13 @@
 package edu.practicum.client;
 
+import com.google.gson.Gson;
 import edu.practicum.data.Constants;
 import edu.practicum.models.Order;
 import edu.practicum.models.OrderAfterCreate;
 import io.qameta.allure.Step;
 import io.restassured.response.Response;
+
+import java.util.ArrayList;
 
 import static io.restassured.RestAssured.given;
 
@@ -47,12 +50,13 @@ public class OrderClient {
     }
 
     @Step("Getting information about courier orders, taking into account the nearest metro stations with GET request to /api/v1/orders")
-    public static Response getListForCourierWithNearestStations(int courierId, String stations) {
+    public static Response getListForCourierWithNearestStations(int courierId, ArrayList stations) {
         return
                 given().log().all()
                         .header("Content-type", "application/json")
                         .queryParam("courierId", courierId)
-                        .queryParam(stations)
+                        .queryParam("nearestStation", new Gson().toJson(stations))
+                        //.queryParam(stations)
                         .get(Constants.GET_ORDER_LIST_REQUEST);
     }
 
@@ -74,5 +78,12 @@ public class OrderClient {
                         .queryParam("courierId", courierId)
                         .when()
                         .put(Constants.COURIER_ACCEPT_ORDER_REQUEST + "/" + orderId);
+    }
+
+    @Step("Cancellation the list of orders")
+    public static void cancelListOfOrders(ArrayList<OrderAfterCreate> orders) {
+        for (int i = 0; i < orders.size(); i++) {
+            cancel(orders.get(i));
+        }
     }
 }

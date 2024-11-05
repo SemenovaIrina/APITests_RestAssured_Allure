@@ -1,9 +1,11 @@
 package edu.practicum.data;
 
-import edu.practicum.models.CourierAfterLogin;
-import edu.practicum.models.Order;
-import edu.practicum.models.OrderInfoGetInList;
-import edu.practicum.models.OrderList;
+import com.google.gson.Gson;
+import edu.practicum.models.*;
+import io.qameta.allure.internal.shadowed.jackson.core.JsonProcessingException;
+import io.qameta.allure.internal.shadowed.jackson.core.json.JsonWriteFeature;
+import io.qameta.allure.internal.shadowed.jackson.databind.JsonNode;
+import io.qameta.allure.internal.shadowed.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -69,6 +71,21 @@ public class UtilsForDataPrepare {
             list.add(order.getMetroStation());
         }
         return list;
+    }
+
+    public static String metroStationsToJson(ArrayList<String> stations) throws JsonProcessingException {
+        //преобразуем список станций в json
+        Gson gson = new Gson();
+        NearestMetroStations nearestStations = new NearestMetroStations();
+        nearestStations.setNearestStation(stations);
+        String nearestStationsJson = gson.toJson(nearestStations);
+        //убираем кавычки у поля json (согласно примеру в документации их нет)
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.disable(JsonWriteFeature.QUOTE_FIELD_NAMES.mappedFeature());
+        JsonNode jsonNode = objectMapper.readTree(nearestStationsJson);
+        String jsonStringWithoutQuotes = objectMapper.writeValueAsString(jsonNode);
+
+        return jsonStringWithoutQuotes;
     }
 
     public static ArrayList<Order> orderListWithFixedMetroStationsForCourier(ArrayList<String> metroStations, CourierAfterLogin courierAfterLogin) {

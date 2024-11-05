@@ -1,15 +1,12 @@
 package edu.practicum;
 
-import com.google.gson.Gson;
+import edu.practicum.client.CourierClient;
 import edu.practicum.client.OrderClient;
 import edu.practicum.data.Colors;
 import edu.practicum.general.PrepareForTests;
 import edu.practicum.models.*;
 import io.qameta.allure.Description;
 import io.qameta.allure.internal.shadowed.jackson.core.JsonProcessingException;
-import io.qameta.allure.internal.shadowed.jackson.core.json.JsonWriteFeature;
-import io.qameta.allure.internal.shadowed.jackson.databind.JsonNode;
-import io.qameta.allure.internal.shadowed.jackson.databind.ObjectMapper;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.Test;
 
@@ -70,11 +67,16 @@ public class OrderListTest extends PrepareForTests {
         //установлено, что в момент обновления информации о заказе создается еще один идентичный заказ, но с другим id
         //таким образом, в получаемом списке заказов для курьера всегда минимум 2 заказа
         //в связи с недостаточностью информации не совсем понятно на сколько это корректное поведение
+
+        //удаляем созданных курьера и отменяем созданный заказ
+        OrderClient.cancel(orderAfterCreate);
+        CourierClient.delete(courierAfterLogin);
     }
 
     @Test
     @Description("Checking the possibility of receiving a list of orders from the specified courier, taking into account the nearest metro stations.")
     public void getListOrdersForCourierWithNearestStation() throws JsonProcessingException {
+        //тест может падать из-за бага в запросе на получение списка заказов для курьера (не всегда возвращаются заказы указанного курьера)
         Random rnd = new Random();
         //создаем курьера и пытаемся залогинить его в системе
         Courier courier = new Courier.Builder()
@@ -85,26 +87,12 @@ public class OrderListTest extends PrepareForTests {
         CourierAfterLogin courierAfterLogin = checksCorrectCreateAndLoginCourier(courier).as(CourierAfterLogin.class);
         //генерируем список ближайших станций
         ArrayList<String> stations = metroStationsListGenerate(rnd.nextInt(10) + 1);
-        //преобразуем список станций в json
-        Gson gson = new Gson();
-        NearestMetroStations nearestStations = new NearestMetroStations();
-        nearestStations.setNearestStation(stations);
-        String nearestStationsJson = gson.toJson(nearestStations);
-        //убираем кавычки у поля json (согласно примеру в документации их нет)
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.disable(JsonWriteFeature.QUOTE_FIELD_NAMES.mappedFeature());
-        JsonNode jsonNode = objectMapper.readTree(nearestStationsJson);
-        String jsonStringWithoutQuotes = objectMapper.writeValueAsString(jsonNode);
-        //уберем внешние скобки у json (для корректной подстановки json в качестве параметра)
-        nearestStationsJson = jsonStringWithoutQuotes.substring(1, jsonStringWithoutQuotes.length() - 1);
-        //заменим : на = (для корректной подстановки json в качестве параметра)
-        nearestStationsJson = nearestStationsJson.replace(':', '=');
         //создаем заказы с соответствующими станциями и назначаем их курьеру
         ArrayList<Order> list = orderListWithFixedMetroStationsForCourier(stations, courierAfterLogin);
         //проверяем возможность принять заказы курьером
-        checkCreateAndAcceptOrders(list, courierAfterLogin);
+        ArrayList<OrderAfterCreate> orderList = checkCreateAndAcceptOrders(list, courierAfterLogin);
         //получаем список заказов тестового курьера c учетом ближайших станций
-        Response response = OrderClient.getListForCourierWithNearestStations(courierAfterLogin.getId(), nearestStationsJson);
+        Response response = OrderClient.getListForCourierWithNearestStations(courierAfterLogin.getId(), stations);
         //проверяем статус код ответа
         assertEquals(200, response.statusCode(), "Получаемый статус код при получении списка заказов курьера не соответствует ожидаемому");
         //проверяем структуру ответа
@@ -114,9 +102,14 @@ public class OrderListTest extends PrepareForTests {
 
         //из-за того, что в момент обновления информации о заказе создается еще один идентичный заказ, но с другим id
         //в списке stationsFromListOrders будут храниться дублирующиеся значения
-        //также может отличаться порядок элементов в списках
+        //также может отличаться порядок элементов в списках -> для сравнения преобразуем все в множество
         Set<String> stationsSet = new HashSet<String>(stations);
         Set<String> stationsFromListOrdersSet = new HashSet<String>(stationsFromListOrders);
         assertEquals(stationsSet, stationsFromListOrdersSet, "Список заказов сформирован без учета ближайших станций метро");
+
+        //отменим созданные заказы
+        OrderClient.cancelListOfOrders(orderList);
+        //удаляем созданного курьера
+        CourierClient.delete(courierAfterLogin);
     }
 }

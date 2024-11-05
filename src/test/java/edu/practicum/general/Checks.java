@@ -68,9 +68,11 @@ public class Checks {
     }
 
     @Step("Checking the courier's ability to accept the list of orders")
-    public static void checkCreateAndAcceptOrders(ArrayList<Order> order, CourierAfterLogin courierAfterLogin) {
-        for (int i = 0; i < order.size(); i++) {
-            OrderAfterCreate orderAfterCreate = checkCreateOrder(order.get(i));
+    public static ArrayList<OrderAfterCreate> checkCreateAndAcceptOrders(ArrayList<Order> orders, CourierAfterLogin courierAfterLogin) {
+        ArrayList<OrderAfterCreate> orderList = new ArrayList<OrderAfterCreate>();
+        for (int i = 0; i < orders.size(); i++) {
+            OrderAfterCreate orderAfterCreate = checkCreateOrder(orders.get(i));
+            orderList.add(orderAfterCreate);
             //получим id заказа
             Response responseGet = OrderClient.getInfo(orderAfterCreate);
             assertEquals(200, responseGet.statusCode(), "Получаемый статус код при получении информации о заказе не соответствует ожидаемому");
@@ -81,5 +83,6 @@ public class Checks {
             //проверяем статус код ответа
             assertEquals(200, response.statusCode(), "Получаемый статус код при назначении заказа курьеру не соответствует ожидаемому");
         }
+        return orderList;
     }
 }
